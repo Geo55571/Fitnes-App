@@ -11,6 +11,7 @@ import {
   EMPTY_WINTER_ARC,
   parseWinterArc,
   patchDay,
+  type ArcSharedDay,
   type ArcWeeklyRule,
   type ArcWorkoutKind,
   type ChallengeException,
@@ -70,8 +71,10 @@ export type GoalInput = Omit<Goal, 'id' | 'createdAt' | 'startDate' | 'endDate'>
 type DataState = BackupData & {
   /** Synced challenge totals: challengeId → personId → value (cache for offline viewing). */
   challengeTotals: Record<string, Record<string, number>>;
-  /** Winter Arc 2026/27 check-ins. Kept on this device only; never synced. */
+  /** Winter Arc 2026/27 check-ins. Group-mates only ever see each day's completion (see arcSharedDays). */
   winterArc: WinterArcData;
+  /** Group-mates' shared Winter Arc days, by person id (synced, plus sample people). */
+  arcShared: Record<string, ArcSharedDay[]>;
 };
 
 /** Everything downloaded by a group sync; replaces the previous download wholesale. */
@@ -80,6 +83,7 @@ export interface RemoteData {
   people: Person[];
   peopleSessions: Session[];
   challengeTotals: Record<string, Record<string, number>>;
+  arcShared: Record<string, ArcSharedDay[]>;
 }
 
 interface Actions {
@@ -168,6 +172,7 @@ const initialData = (): DataState => ({
   routines: [],
   challengeTotals: {},
   winterArc: EMPTY_WINTER_ARC,
+  arcShared: {},
 });
 
 function sanitizeEntries(entries: Omit<Entry, 'id'>[]): Entry[] {
@@ -393,6 +398,7 @@ export const useStore = create<AppState>()(
           peopleSessions: [...s.peopleSessions.filter((x) => !x.demo), ...demo.peopleSessions],
           sessions: [...s.sessions, ...demo.mySessions],
           groups: [...s.groups, ...demo.groups],
+          arcShared: { ...s.arcShared, ...demo.arcShared },
           demoLoaded: true,
         }));
       },
@@ -408,6 +414,7 @@ export const useStore = create<AppState>()(
               .filter((g) => !g.demo)
               .map((g) => ({ ...g, memberIds: g.memberIds.filter((m) => !demoPeople.has(m)) })),
             demoLoaded: false,
+            arcShared: Object.fromEntries(Object.entries(s.arcShared).filter(([id]) => !demoPeople.has(id))),
           };
         }),
 
@@ -499,6 +506,10 @@ export const useStore = create<AppState>()(
           people: [...s.people.filter((p) => p.source !== 'remote'), ...d.people],
           peopleSessions: [...s.peopleSessions.filter((x) => !x.remote), ...d.peopleSessions],
           challengeTotals: d.challengeTotals,
+          arcShared: {
+            ...Object.fromEntries(Object.entries(s.arcShared).filter(([id]) => s.people.some((p) => p.id === id && p.source === 'demo'))),
+            ...d.arcShared,
+          },
         })),
       clearRemote: () =>
         set((s) => ({
@@ -506,6 +517,7 @@ export const useStore = create<AppState>()(
           people: s.people.filter((p) => p.source !== 'remote'),
           peopleSessions: s.peopleSessions.filter((x) => !x.remote),
           challengeTotals: {},
+          arcShared: Object.fromEntries(Object.entries(s.arcShared).filter(([id]) => s.people.some((p) => p.id === id && p.source === 'demo'))),
         })),
 
       exportData: () => {
@@ -563,6 +575,7 @@ export const useStore = create<AppState>()(
         routines: s.routines,
         challengeTotals: s.challengeTotals,
         winterArc: s.winterArc,
+        arcShared: s.arcShared,
       }),
       // Fill in any fields added after a user's data was first saved.
       merge: (persisted, current) => {

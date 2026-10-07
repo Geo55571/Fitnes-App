@@ -22,6 +22,7 @@ export function SyncRunner() {
       color: s.avatar.badgeColor,
       sharing: s.settings.sharing,
       leaderboards: s.settings.showOnLeaderboards,
+      winterArc: s.winterArc,
     })),
   );
 

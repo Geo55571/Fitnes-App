@@ -784,3 +784,44 @@ export function mergeWinterArc(current: WinterArcData, incoming: WinterArcData):
     weeks: { ...incoming.weeks, ...current.weeks },
   };
 }
+
+// ---------- sharing with group-mates ----------
+
+/**
+ * What group-mates see of one Winter Arc day: whether it was completed and how many of the daily
+ * rules were done — never which ones (the discipline rule stays private).
+ */
+export interface ArcSharedDay {
+  date: DayKey;
+  done: number;
+  total: number;
+  complete: boolean;
+}
+
+/** The days to share: every tracked day up to today that is past or has a check-in. */
+export function arcSharedDays(stats: ChallengeStatistics, today: DayKey): ArcSharedDay[] {
+  const out: ArcSharedDay[] = [];
+  for (const d of stats.days) {
+    if (d.status === 'future' || d.status === 'untracked') continue;
+    if (d.date === today && !d.entry) continue;
+    const list = Object.values(d.outcomes);
+    out.push({ date: d.date, done: list.filter((o) => o === 'done' || o === 'exception').length, total: list.length, complete: d.perfect || d.allExcepted });
+  }
+  return out;
+}
+
+export interface ArcMemberSummary {
+  /** Today's shared day, if they checked in. */
+  today: ArcSharedDay | null;
+  streak: number;
+  perfectDays: number;
+}
+
+/** A group-mate's progress from what they share. Their streak through yesterday stays alive until today ends. */
+export function arcMemberSummary(days: ArcSharedDay[], today: DayKey): ArcMemberSummary {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const todayDay = byDate.get(today) ?? null;
+  let streak = 0;
+  for (let d = todayDay?.complete ? today : addDays(today, -1); byDate.get(d)?.complete; d = addDays(d, -1)) streak++;
+  return { today: todayDay, streak, perfectDays: days.filter((d) => d.complete).length };
+}

@@ -1,5 +1,5 @@
 import { call } from './api';
-import type { GroupRow, ProfileRow, Remote, SessionRow, TotalRow } from './engine';
+import type { ArcDayRow, GroupRow, ProfileRow, Remote, SessionRow, TotalRow } from './engine';
 
 /** The sync engine's Remote over the FORM sync server. Privacy rules are enforced by the server. */
 export function httpRemote(token: string): Remote {
@@ -23,5 +23,8 @@ export function httpRemote(token: string): Remote {
     regenerateInvite: (groupId) => rpc<string>('regenerateInvite', { groupId }),
     createChallenge: (groupId, challenge) => rpc('createChallenge', { groupId, challenge }),
     deleteChallenge: (challengeId) => rpc('deleteChallenge', { challengeId }),
+    upsertArcDays: (rows) => rpc('upsertArcDays', { rows }),
+    deleteMyArcDays: () => rpc('deleteMyArcDays'),
+    listArcDays: (userIds, since) => rpc<ArcDayRow[]>('listArcDays', { userIds, since }),
   };
 }

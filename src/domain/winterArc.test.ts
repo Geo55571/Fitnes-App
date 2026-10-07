@@ -4,6 +4,8 @@ import { describe, it } from 'node:test';
 import type { Session } from './types';
 import {
   ARC_TOTAL_DAYS,
+  arcMemberSummary,
+  arcSharedDays,
   arcDayNumber,
   arcPhase,
   arcStatistics,
@@ -263,5 +265,26 @@ describe('Winter Arc data', () => {
     const merged = mergeWinterArc(data, joined({ '2026-10-01': newer, '2026-10-02': perfectDay }));
     assert.equal(merged.days['2026-10-01'].reading!.minutes, 45);
     assert.ok(merged.days['2026-10-02']);
+  });
+});
+
+describe('Winter Arc sharing', () => {
+  it('shares only completion and a count, and summarises a member', () => {
+    const days = { ...perfectRange('2026-10-01', '2026-10-03'), '2026-10-05': { nutrition: { mark: 'done' as const }, updatedAt: T } };
+    const st = arcStatistics({ data: joined(days), sessions: [], today: '2026-10-05' });
+    const shared = arcSharedDays(st, '2026-10-05');
+    assert.deepEqual(shared.map((d) => [d.date, d.done, d.complete]), [
+      ['2026-10-01', 3, true],
+      ['2026-10-02', 3, true],
+      ['2026-10-03', 3, true],
+      ['2026-10-04', 0, false],
+      ['2026-10-05', 1, false],
+    ]);
+    assert.ok(!('nutrition' in shared[4]));
+    const sum = arcMemberSummary(shared, '2026-10-05');
+    assert.equal(sum.today?.done, 1);
+    assert.equal(sum.streak, 0); // Oct 4 was missed
+    assert.equal(sum.perfectDays, 3);
+    assert.equal(arcMemberSummary(shared, '2026-10-04').streak, 3); // through yesterday
   });
 });

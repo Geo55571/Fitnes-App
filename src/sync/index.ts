@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import { showToast } from '@/components/toast';
 import { dayKeyFor, resolveTimeZone } from '@/domain/dates';
 import type { Challenge } from '@/domain/types';
+import { arcSharedDays, arcStatistics } from '@/domain/winterArc';
 import { useStore } from '@/store/store';
 
 import { AuthExpiredError, call } from './api';
@@ -190,6 +191,8 @@ async function runOnce() {
   try {
     const app = useStore.getState();
     const tz = resolveTimeZone(app.settings.timeZone);
+    const today = dayKeyFor(new Date(), tz);
+    const arcDays = app.winterArc.joinedAt ? arcSharedDays(arcStatistics({ data: app.winterArc, sessions: app.sessions, today }), today) : undefined;
     const raw = await AsyncStorage.getItem(pushKey(userId));
     const prev: PushState = raw ? JSON.parse(raw) : EMPTY_PUSH;
     const result = await syncOnce(
@@ -201,7 +204,8 @@ async function runOnce() {
         sharing: app.settings.sharing,
         showOnLeaderboards: app.settings.showOnLeaderboards,
         sessions: app.sessions,
-        today: dayKeyFor(new Date(), tz),
+        today,
+        arcDays,
       },
       prev,
     );

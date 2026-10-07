@@ -7,6 +7,7 @@
  */
 import { addDays, diffDays, startOfWeek } from '@/domain/dates';
 import type { Category, DayKey, Entry, Group, Person, Session } from '@/domain/types';
+import { WINTER_ARC, type ArcSharedDay } from '@/domain/winterArc';
 
 const ME = 'me';
 
@@ -99,6 +100,33 @@ function generate(personId: string, planKey: string, today: DayKey, days: number
   return out;
 }
 
+/** Sample friends' shared Winter Arc days: how consistent each one is, and whether they've checked in today. */
+const ARC_HABITS: { id: string; rate: number; todayDone: number | null }[] = [
+  { id: 'demo-alex', rate: 0.95, todayDone: 3 },
+  { id: 'demo-jordan', rate: 0.8, todayDone: 2 },
+  { id: 'demo-taylor', rate: 0.7, todayDone: null },
+  { id: 'demo-morgan', rate: 0.5, todayDone: 3 },
+];
+
+function demoArc(today: DayKey): Record<string, ArcSharedDay[]> {
+  const out: Record<string, ArcSharedDay[]> = {};
+  if (today < WINTER_ARC.start) return out;
+  ARC_HABITS.forEach((h, i) => {
+    const r = rng(301 + i * 13);
+    const days: ArcSharedDay[] = [];
+    for (let d = WINTER_ARC.start; d <= today && d <= WINTER_ARC.end; d = addDays(d, 1)) {
+      if (d === today) {
+        if (h.todayDone !== null) days.push({ date: d, done: h.todayDone, total: 3, complete: h.todayDone === 3 });
+        continue;
+      }
+      const complete = r() < h.rate;
+      days.push({ date: d, done: complete ? 3 : Math.floor(r() * 3), total: 3, complete });
+    }
+    out[h.id] = days;
+  });
+  return out;
+}
+
 export function buildDemoData(today: DayKey) {
   const peopleSessions = PEOPLE.flatMap((p, i) =>
     generate(p.id, p.id.replace('demo-', ''), today, 27, true, 101 + i * 17),
@@ -135,5 +163,5 @@ export function buildDemoData(today: DayKey) {
     ],
   };
 
-  return { people: PEOPLE, peopleSessions, mySessions, groups: [group] };
+  return { people: PEOPLE, peopleSessions, mySessions, groups: [group], arcShared: demoArc(today) };
 }

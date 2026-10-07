@@ -12,7 +12,7 @@ import { Button } from '../ui';
  * Only the day, the streak and whether today is checked in — the details live in the challenge.
  */
 export function WinterArcCard({ style, invite }: { style?: StyleProp<ViewStyle>; invite?: boolean }) {
-  const { stats, joined, today } = useWinterArc();
+  const { stats, joined } = useWinterArc();
   if (!joined && !invite) return null;
   if (!joined && stats.phase === 'finished') return null;
 
@@ -49,7 +49,7 @@ export function WinterArcCard({ style, invite }: { style?: StyleProp<ViewStyle>;
         doneToday ? (
           <Icon name="check-circle" size={26} color={colors.primary} />
         ) : (
-          <Button label="Check in" compact onPress={() => router.push({ pathname: '/winter-arc/day/[date]', params: { date: today } })} style={styles.btn} />
+          <Button label="Check in" compact onPress={() => router.push('/winter-arc')} style={styles.btn} />
         )
       ) : (
         <Icon name="chevron-right" size={22} color={colors.textTertiary} />

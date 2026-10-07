@@ -85,6 +85,7 @@ export class SyncStore extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS challenges_by_group ON challenges (group_id);
       CREATE TABLE IF NOT EXISTS challenge_totals (challenge_id TEXT NOT NULL, user_id TEXT NOT NULL, value REAL NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (challenge_id, user_id));
       CREATE TABLE IF NOT EXISTS sessions (user_id TEXT NOT NULL, id TEXT NOT NULL, date TEXT NOT NULL, performed_at TEXT NOT NULL, category TEXT NOT NULL, entries TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, id));
+      CREATE TABLE IF NOT EXISTS arc_days (user_id TEXT NOT NULL, date TEXT NOT NULL, done INTEGER NOT NULL, total INTEGER NOT NULL, complete INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, date));
     `);
   }
 
@@ -217,7 +218,7 @@ export class SyncStore extends DurableObject<Env> {
       case 'deleteAccount': {
         for (const g of this.all<{ id: string }>('SELECT id FROM groups WHERE owner_id = ?', me)) this.leave(g.id, me);
         for (const id of this.myGroupIds(me)) this.leave(id, me);
-        for (const t of ['sessions', 'challenge_totals', 'tokens']) this.run(`DELETE FROM ${t} WHERE user_id = ?`, me);
+        for (const t of ['sessions', 'challenge_totals', 'tokens', 'arc_days']) this.run(`DELETE FROM ${t} WHERE user_id = ?`, me);
         this.run('DELETE FROM profiles WHERE id = ?', me);
         this.run('DELETE FROM users WHERE id = ?', me);
         return null;
@@ -322,6 +323,41 @@ export class SyncStore extends DurableObject<Env> {
         const ids = strings(a.challengeIds);
         if (ids.length) this.run(`DELETE FROM challenge_totals WHERE user_id = ? AND challenge_id IN (${this.marks(ids.length)})`, me, ...ids);
         return null;
+      }
+      // Winter Arc check-ins: per day only whether it was completed and how many daily rules were done.
+      case 'upsertArcDays': {
+        const rows = (Array.isArray(a.rows) ? a.rows : []).slice(0, 200) as Record<string, unknown>[];
+        for (const r of rows) {
+          const done = Number(r.done);
+          const total = Number(r.total);
+          if (!DAY.test(String(r.date)) || !Number.isInteger(done) || !Number.isInteger(total) || done < 0 || total < 1 || total > 10 || done > total) continue;
+          this.run(
+            `INSERT INTO arc_days (user_id, date, done, total, complete, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (user_id, date) DO UPDATE SET done = excluded.done, total = excluded.total, complete = excluded.complete, updated_at = excluded.updated_at`,
+            me,
+            String(r.date),
+            done,
+            total,
+            r.complete === true ? 1 : 0,
+            now,
+          );
+        }
+        return null;
+      }
+      case 'deleteMyArcDays':
+        this.run('DELETE FROM arc_days WHERE user_id = ?', me);
+        return null;
+      case 'listArcDays': {
+        const mates = this.mates(me);
+        const ids = strings(a.userIds).filter((id) => mates.has(id) && id !== me);
+        const since = DAY.test(String(a.since)) ? String(a.since) : '0000-00-00';
+        if (!ids.length) return [];
+        return this.all<Row>(
+          `SELECT user_id, date, done, total, complete FROM arc_days WHERE date >= ? AND user_id IN (${this.marks(ids.length)})
+             AND user_id IN (SELECT id FROM profiles WHERE sharing != 'private')`,
+          since,
+          ...ids,
+        ).map((r) => ({ ...r, complete: !!r.complete }));
       }
       case 'createGroup': {
         const name = str(a.name, 60, 'group name');

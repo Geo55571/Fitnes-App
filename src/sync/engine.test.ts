@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 
 import { leaderboard, membersOf, ME_ID } from '../domain/groups';
 import type { Challenge, Person, Session, Settings } from '../domain/types';
+import type { ArcSharedDay } from '../domain/winterArc';
 import {
   EMPTY_PUSH,
   overtakes,
@@ -241,5 +242,66 @@ describe('group sync engine', () => {
     await syncOnce(fakeRemote(srv, A), A, { name: 'Ana', color: '#1F4B39', sharing: 'everything', showOnLeaderboards: true, today, sessions: [ride] }, EMPTY_PUSH);
     assert.equal(srv.sessions.length, 1);
     assert.deepEqual(srv.sessions[0].entries, [{ id: 'e', exerciseId: 'cycling', distanceM: 7240, durationSec: 2112 }]);
+  });
+});
+
+describe('Winter Arc sharing in sync', () => {
+  const today = '2026-10-07';
+  const A = 'user-a';
+  const B = 'user-b';
+
+  /** Adds the server's Winter Arc rules (group-mates only, nothing from private profiles) to the fake. */
+  function withArc(srv: FakeServer, me: string, store: Map<string, ArcSharedDay[]>): Remote {
+    return {
+      ...fakeRemote(srv, me),
+      async upsertArcDays(rows) {
+        const mine = new Map((store.get(me) ?? []).map((d) => [d.date, d]));
+        for (const r of rows) mine.set(r.date, r);
+        store.set(me, [...mine.values()]);
+      },
+      async deleteMyArcDays() {
+        store.delete(me);
+      },
+      async listArcDays(userIds, since) {
+        return userIds
+          .filter((id) => id !== me && srv.sharesGroup(me, id) && srv.sharing(id) !== 'private')
+          .flatMap((id) => (store.get(id) ?? []).filter((d) => d.date >= since).map((d) => ({ ...d, user_id: id })));
+      },
+    };
+  }
+
+  it('shows group-mates each day’s completion, and stops when private', async () => {
+    const srv = new FakeServer();
+    const store = new Map<string, ArcSharedDay[]>();
+    const ra = withArc(srv, A, store);
+    const rb = withArc(srv, B, store);
+    const g = await ra.createGroup('Winter crew');
+    await rb.joinGroup(g.invite_code);
+    const arcDays: ArcSharedDay[] = [
+      { date: '2026-10-06', done: 3, total: 3, complete: true },
+      { date: '2026-10-07', done: 2, total: 3, complete: false },
+    ];
+    const a: LocalSnapshot = { name: 'Ana', color: '#1F4B39', sharing: 'challenges', showOnLeaderboards: true, today, sessions: [], arcDays };
+    const b: LocalSnapshot = { name: 'Ben', color: '#3B5B85', sharing: 'everything', showOnLeaderboards: true, today, sessions: [] };
+
+    const pa = (await syncOnce(ra, A, a, EMPTY_PUSH)).push;
+    const seen = await syncOnce(rb, B, b, EMPTY_PUSH);
+    assert.deepEqual(seen.arcShared[A], arcDays);
+
+    // Unchanged days aren't sent again.
+    const before = store.get(A);
+    await syncOnce(ra, A, a, pa);
+    assert.equal(store.get(A), before);
+
+    // Going private removes them from the server.
+    await syncOnce(ra, A, { ...a, sharing: 'private' }, pa);
+    assert.equal(store.has(A), false);
+    assert.deepEqual((await syncOnce(rb, B, b, EMPTY_PUSH)).arcShared, {});
+  });
+
+  it('keeps syncing with a server that has no Winter Arc support', async () => {
+    const srv = new FakeServer();
+    const r = await syncOnce(fakeRemote(srv, A), A, { name: 'Ana', color: '#1F4B39', sharing: 'everything', showOnLeaderboards: true, today, sessions: [], arcDays: [] }, EMPTY_PUSH);
+    assert.deepEqual(r.arcShared, {});
   });
 });

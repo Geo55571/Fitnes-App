@@ -2,6 +2,7 @@ import { addDays } from '../domain/dates';
 import { ME_ID } from '../domain/groups';
 import { totalInRange } from '../domain/metrics';
 import type { Challenge, DayKey, Group, Metric, Person, Session, SharingLevel } from '../domain/types';
+import { WINTER_ARC, type ArcSharedDay } from '../domain/winterArc';
 
 /**
  * Group sync, independent of any SDK. `Remote` is implemented with Supabase in remote.ts
@@ -56,6 +57,10 @@ export interface TotalRow {
   value: number;
 }
 
+export interface ArcDayRow extends ArcSharedDay {
+  user_id: string;
+}
+
 export interface Remote {
   upsertProfile(p: ProfileRow): Promise<void>;
   listMyGroups(): Promise<GroupRow[]>;
@@ -75,6 +80,10 @@ export interface Remote {
   regenerateInvite(groupId: string): Promise<string>;
   createChallenge(groupId: string, c: Omit<Challenge, 'id' | 'createdAt'>): Promise<void>;
   deleteChallenge(challengeId: string): Promise<void>;
+  /** Winter Arc check-ins. Optional: a server without them simply doesn't share Winter Arc progress. */
+  upsertArcDays?(rows: ArcSharedDay[]): Promise<void>;
+  deleteMyArcDays?(): Promise<void>;
+  listArcDays?(userIds: string[], sinceDate: DayKey): Promise<ArcDayRow[]>;
 }
 
 // ---------- local side ----------
@@ -87,12 +96,16 @@ export interface LocalSnapshot {
   /** The user's own sessions (sample sessions are never uploaded). */
   sessions: Session[];
   today: DayKey;
+  /** Winter Arc days to share; absent when not taking part. */
+  arcDays?: ArcSharedDay[];
 }
 
 /** What has been uploaded, so each pass only sends changes. Persisted per account. */
 export interface PushState {
   sessions: Record<string, string>; // id → updatedAt
   cleared: boolean; // own sessions removed from the server after leaving "everything"
+  /** Winter Arc days uploaded: date → "done/total/complete". */
+  arc?: Record<string, string>;
 }
 
 export const EMPTY_PUSH: PushState = { sessions: {}, cleared: false };
@@ -116,6 +129,8 @@ export interface SyncResult {
   challengeTotals: Record<string, Record<string, number>>;
   push: PushState;
   standings: Record<string, Standing>; // by challenge id
+  /** Group-mates' Winter Arc days, by person id. */
+  arcShared: Record<string, ArcSharedDay[]>;
 }
 
 export function toGroup(row: GroupRow, userId: string): Group {
@@ -179,6 +194,23 @@ export async function syncOnce(remote: Remote, userId: string, local: LocalSnaps
     push = { sessions: {}, cleared: true };
   }
 
+  // 2b) Winter Arc check-ins — shared unless private. An older server without them is skipped.
+  const arcKey = (d: ArcSharedDay) => `${d.done}/${d.total}/${d.complete ? 1 : 0}`;
+  if (remote.upsertArcDays && remote.deleteMyArcDays) {
+    try {
+      if (local.arcDays && local.sharing !== 'private') {
+        const changed = local.arcDays.filter((d) => prev.arc?.[d.date] !== arcKey(d));
+        if (changed.length) await remote.upsertArcDays(changed);
+        push.arc = Object.fromEntries(local.arcDays.map((d) => [d.date, arcKey(d)]));
+      } else if (prev.arc && Object.keys(prev.arc).length) {
+        await remote.deleteMyArcDays();
+        push.arc = {};
+      } else push.arc = prev.arc;
+    } catch {
+      push.arc = prev.arc;
+    }
+  }
+
   // 3) Groups and challenge totals (own totals are computed here, from saved sessions).
   const groupRows = await remote.listMyGroups();
   const challenges = groupRows.flatMap((g) => g.challenges);
@@ -228,6 +260,12 @@ export async function syncOnce(remote: Remote, userId: string, local: LocalSnaps
     remote: true,
   }));
 
+  const arcShared: Record<string, ArcSharedDay[]> = {};
+  if (remote.listArcDays && memberIds.length) {
+    const rows = await remote.listArcDays(memberIds, WINTER_ARC.start).catch(() => [] as ArcDayRow[]);
+    for (const { user_id, ...d } of rows) (arcShared[user_id] ??= []).push(d);
+  }
+
   // 5) Standings, so the app can tell you when someone passes you.
   const groups = groupRows.map((g) => toGroup(g, userId));
   const standings: Record<string, Standing> = {};
@@ -241,7 +279,7 @@ export async function syncOnce(remote: Remote, userId: string, local: LocalSnaps
     }
   }
 
-  return { groups, people, peopleSessions, challengeTotals, push, standings };
+  return { groups, people, peopleSessions, challengeTotals, push, standings, arcShared };
 }
 
 /** People who moved ahead of you since the previous sync, per challenge. */
