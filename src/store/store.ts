@@ -7,6 +7,17 @@ import { addDays } from '@/domain/dates';
 import { CUSTOM_ICON, setCustomExercises, type Exercise } from '@/domain/exercises';
 import { checkProgression } from '@/domain/goals';
 import type { PlannedWorkout } from '@/domain/workoutScan';
+import {
+  EMPTY_WINTER_ARC,
+  parseWinterArc,
+  patchDay,
+  type ArcWeeklyRule,
+  type ArcWorkoutKind,
+  type ChallengeException,
+  type DailyChallengeEntry,
+  type EnduranceActivity,
+  type WinterArcData,
+} from '@/domain/winterArc';
 import type {
   AvatarConfig,
   Category,
@@ -38,6 +49,18 @@ export interface SessionInput {
   source?: Session['source'];
 }
 
+/** A strength or endurance workout added from Winter Arc. Saved as a normal session. */
+export interface ArcWorkoutInput {
+  date: DayKey;
+  kind: ArcWorkoutKind;
+  activity?: EnduranceActivity;
+  name: string;
+  durationSec?: number;
+  distanceM?: number;
+  note?: string;
+  performedAt?: string;
+}
+
 export type GoalInput = Omit<Goal, 'id' | 'createdAt' | 'startDate' | 'endDate'> & { startDate?: DayKey };
 
 /**
@@ -47,6 +70,8 @@ export type GoalInput = Omit<Goal, 'id' | 'createdAt' | 'startDate' | 'endDate'>
 type DataState = BackupData & {
   /** Synced challenge totals: challengeId → personId → value (cache for offline viewing). */
   challengeTotals: Record<string, Record<string, number>>;
+  /** Winter Arc 2026/27 check-ins. Kept on this device only; never synced. */
+  winterArc: WinterArcData;
 };
 
 /** Everything downloaded by a group sync; replaces the previous download wholesale. */
@@ -94,6 +119,16 @@ interface Actions {
   saveRoutine(r: Pick<Routine, 'name' | 'category' | 'entries'>): Routine;
   deleteRoutine(id: string): void;
 
+  joinWinterArc(trackFrom: DayKey): void;
+  /** Stops showing the challenge. Check-ins stay saved, so joining again restores them. */
+  leaveWinterArc(): void;
+  setArcTrackFrom(date: DayKey): void;
+  updateArcDay(date: DayKey, patch: Partial<Omit<DailyChallengeEntry, 'updatedAt'>>): void;
+  setArcWeekException(monday: DayKey, rule: ArcWeeklyRule, exception: ChallengeException | null): void;
+  /** Creates (or, with an id, updates) the workout's session and its Winter Arc details. */
+  saveArcWorkout(input: ArcWorkoutInput, sessionId?: string): Session;
+  deleteArcWorkout(sessionId: string): void;
+
   /** Replace synced data with a fresh download (local and sample data are kept). */
   applyRemote(data: RemoteData): void;
   /** Drop all synced data (on sign-out). */
@@ -132,6 +167,7 @@ const initialData = (): DataState => ({
   customExercises: [],
   routines: [],
   challengeTotals: {},
+  winterArc: EMPTY_WINTER_ARC,
 });
 
 function sanitizeEntries(entries: Omit<Entry, 'id'>[]): Entry[] {
@@ -209,7 +245,12 @@ export const useStore = create<AppState>()(
           ),
         })),
 
-      deleteSession: (id) => set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) })),
+      deleteSession: (id) =>
+        set((s) => {
+          if (!s.winterArc.workouts[id]) return { sessions: s.sessions.filter((x) => x.id !== id) };
+          const { [id]: _gone, ...workouts } = s.winterArc.workouts;
+          return { sessions: s.sessions.filter((x) => x.id !== id), winterArc: { ...s.winterArc, workouts } };
+        }),
 
       addGoal: (input, today) => {
         const goal: Goal = {
@@ -386,6 +427,72 @@ export const useStore = create<AppState>()(
       },
       deleteRoutine: (id) => set((s) => ({ routines: s.routines.filter((r) => r.id !== id) })),
 
+      joinWinterArc: (trackFrom) =>
+        set((s) => ({ winterArc: { ...s.winterArc, joinedAt: new Date().toISOString(), trackFrom } })),
+      leaveWinterArc: () => set((s) => ({ winterArc: { ...s.winterArc, joinedAt: null } })),
+      setArcTrackFrom: (trackFrom) => set((s) => ({ winterArc: { ...s.winterArc, trackFrom } })),
+
+      updateArcDay: (date, patch) =>
+        set((s) => {
+          const days = { ...s.winterArc.days };
+          const next = patchDay(days[date], patch, new Date().toISOString());
+          if (next) days[date] = next;
+          else delete days[date];
+          return { winterArc: { ...s.winterArc, days } };
+        }),
+
+      setArcWeekException: (monday, rule, exception) =>
+        set((s) => {
+          const week = { ...s.winterArc.weeks[monday] };
+          if (exception) week[rule] = exception.note?.trim() ? { note: exception.note.trim().slice(0, 280) } : {};
+          else delete week[rule];
+          const weeks = { ...s.winterArc.weeks };
+          if (week.strength || week.endurance) weeks[monday] = week;
+          else delete weeks[monday];
+          return { winterArc: { ...s.winterArc, weeks } };
+        }),
+
+      saveArcWorkout: (input, sessionId) => {
+        let exerciseId = 'strengthtraining';
+        if (input.kind === 'endurance') {
+          if (input.activity === 'cycling') exerciseId = 'cycling';
+          else if (input.activity === 'other') {
+            const existing = get().customExercises.find((e) => e.category === 'cardio' && e.name.toLowerCase() === 'endurance');
+            exerciseId = existing?.id ?? get().addCustomExercise({ name: 'Endurance', category: 'cardio', kind: 'distance', muscles: [] }).id;
+          } else exerciseId = 'running';
+        }
+        const entry: Omit<Entry, 'id'> = { exerciseId };
+        if (input.durationSec) entry.durationSec = Math.round(input.durationSec);
+        if (input.kind === 'endurance' && input.distanceM) entry.distanceM = input.distanceM;
+        const sessionInput: SessionInput = {
+          date: input.date,
+          category: input.kind === 'strength' ? 'strength' : 'cardio',
+          entries: [entry],
+          performedAt: input.performedAt,
+        };
+        const existing = sessionId ? get().sessions.find((x) => x.id === sessionId) : undefined;
+        if (existing) get().updateSession(existing.id, sessionInput);
+        const session = existing ? get().sessions.find((x) => x.id === existing.id)! : get().addSession(sessionInput);
+        const note = input.note?.trim().slice(0, 280);
+        set((s) => ({
+          winterArc: {
+            ...s.winterArc,
+            workouts: {
+              ...s.winterArc.workouts,
+              [session.id]: {
+                kind: input.kind,
+                name: input.name.trim().slice(0, 60),
+                ...(input.kind === 'endurance' && input.activity ? { activity: input.activity } : {}),
+                ...(note ? { note } : {}),
+              },
+            },
+          },
+        }));
+        return session;
+      },
+
+      deleteArcWorkout: (sessionId) => get().deleteSession(sessionId),
+
       applyRemote: (d) =>
         set((s) => ({
           groups: [...s.groups.filter((g) => !g.remote), ...d.groups],
@@ -417,6 +524,7 @@ export const useStore = create<AppState>()(
           demoLoaded: s.demoLoaded,
           customExercises: s.customExercises,
           routines: s.routines,
+          winterArc: s.winterArc,
         };
       },
 
@@ -430,6 +538,7 @@ export const useStore = create<AppState>()(
             settings: { ...base.settings, ...data.settings },
             avatar: { ...base.avatar, ...data.avatar },
             trackers: data.trackers.length ? data.trackers : base.trackers,
+            winterArc: parseWinterArc(data.winterArc),
           };
         }),
     }),
@@ -453,6 +562,7 @@ export const useStore = create<AppState>()(
         customExercises: s.customExercises,
         routines: s.routines,
         challengeTotals: s.challengeTotals,
+        winterArc: s.winterArc,
       }),
       // Fill in any fields added after a user's data was first saved.
       merge: (persisted, current) => {
@@ -463,6 +573,7 @@ export const useStore = create<AppState>()(
           settings: { ...current.settings, ...p.settings },
           avatar: migrateAvatar(current.avatar, p.avatar),
           profile: { ...current.profile, ...p.profile },
+          winterArc: p.winterArc ? parseWinterArc(p.winterArc) : current.winterArc,
         };
       },
     },

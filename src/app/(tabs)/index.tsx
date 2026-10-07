@@ -7,6 +7,7 @@ import { GoalRow } from '@/components/GoalRow';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
 import { StreakFlame } from '@/components/StreakFlame';
 import { TrackerCard } from '@/components/TrackerCard';
+import { WinterArcCard } from '@/components/winterArc/WinterArcCard';
 import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader } from '@/components/ui';
 import { addDays, formatDayShort, formatRelativeDay } from '@/domain/dates';
 import { goalTitle } from '@/domain/describe';
@@ -110,6 +111,8 @@ export default function TodayScreen() {
         <Text style={styles.editText}>Edit trackers</Text>
       </Pressable>
 
+      <WinterArcCard style={styles.arc} />
+
       <Card style={styles.goals}>
         <SectionHeader
           title={summary.items.length || !summary.weekly.length ? 'Daily goals' : 'Goals'}
@@ -208,6 +211,7 @@ const styles = StyleSheet.create({
   gridItem: { flexBasis: '47%', flexGrow: 1 },
   editTrackers: { alignSelf: 'flex-end', paddingVertical: space.sm },
   editText: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  arc: { marginTop: space.xs, marginBottom: space.lg },
   goals: { marginTop: space.xs, paddingBottom: space.lg },
   goalsHeader: { marginBottom: 2 },
   noGoals: { paddingVertical: space.md, gap: 4 },

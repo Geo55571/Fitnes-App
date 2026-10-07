@@ -12,6 +12,7 @@ import type {
   Settings,
   TrackerConfig,
 } from './types';
+import { mergeWinterArc, parseWinterArc, type WinterArcData } from './winterArc';
 
 /** Everything a user owns. Mirrors the persisted store state. */
 export interface BackupData {
@@ -28,6 +29,8 @@ export interface BackupData {
   demoLoaded: boolean;
   customExercises: Exercise[];
   routines: Routine[];
+  /** Winter Arc check-ins (absent in backups made before the challenge existed). */
+  winterArc?: WinterArcData;
 }
 
 export interface BackupFile {
@@ -161,6 +164,7 @@ export function parseBackup(text: string): ParseResult {
     demoLoaded: d.demoLoaded === true,
     customExercises: keep(d.customExercises, validExercise),
     routines: keep(d.routines, validRoutine),
+    ...(d.winterArc !== undefined ? { winterArc: parseWinterArc(d.winterArc) } : {}),
   };
   // `skipped` is only final after every list above has been filtered.
   return { ok: true, skipped, data };
@@ -201,6 +205,9 @@ export function mergeBackup(current: BackupData, incoming: BackupData): BackupDa
     demoLoaded: current.demoLoaded || incoming.demoLoaded,
     customExercises: byId(current.customExercises, incoming.customExercises),
     routines: byId(current.routines, incoming.routines),
+    ...(current.winterArc || incoming.winterArc
+      ? { winterArc: mergeWinterArc(parseWinterArc(current.winterArc), parseWinterArc(incoming.winterArc)) }
+      : {}),
   };
 }
 

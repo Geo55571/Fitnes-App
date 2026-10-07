@@ -51,8 +51,10 @@ function describeMain(entry: Entry, prefs: UnitPrefs): string {
       return d.sets > 1 ? `${d.reps} reps · ${d.sets} sets` : `${d.reps} reps`;
     }
     case 'duration':
-      return formatDuration(entry.durationSec ?? 0);
+      // Workouts logged without a time (e.g. from Winter Arc) were still done.
+      return entry.durationSec ? formatDuration(entry.durationSec) : 'Done';
     case 'distance': {
+      if (!entry.distanceM && !entry.durationSec) return 'Done';
       // Indoor sessions can have a time but no distance.
       if (!entry.distanceM && entry.durationSec) return formatDuration(entry.durationSec);
       // Swims and rows are counted in meters (yards), not fractions of a km (mile).

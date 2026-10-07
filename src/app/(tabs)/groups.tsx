@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { exerciseIconColor, Icon } from '@/components/Icon';
 import { Leaderboard } from '@/components/Leaderboard';
 import { OverallRanking } from '@/components/OverallRanking';
+import { WinterArcCard } from '@/components/winterArc/WinterArcCard';
 import {
   AppHeader,
   Button,
@@ -98,6 +99,8 @@ export default function GroupsScreen() {
           <IconButton icon="refresh" label="Sync now" size={20} color={colors.textSecondary} onPress={() => syncNow()} />
         </View>
       )}
+
+      <WinterArcCard invite style={styles.block} />
 
       {groups.some((g) => g.challenges.length > 0) && (
         <OverallRanking rows={overallRatings(groups, people, me, sessions, peopleSessions, settings, challengeTotals, today)} style={styles.block} />
