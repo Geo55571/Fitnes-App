@@ -98,6 +98,7 @@ export default function ProgressScreen() {
   const bucketWord = range === 'quarter' ? 'weeks' : 'days';
 
   const [showAllWeek, setShowAllWeek] = useState(false);
+  const [view, setView] = useState<'overview' | 'exercise'>('overview');
   const comparison = useMemo(() => weekComparison(sessions, today), [sessions, today]);
   const trend = useMemo(() => exerciseTrend(sessions, exerciseId, today), [sessions, exerciseId, today]);
   const muscles = useMemo(() => {
@@ -110,163 +111,179 @@ export default function ProgressScreen() {
   return (
     <Screen tab header={<AppHeader />}>
       <ScreenTitle title="Progress" />
+      <Segmented
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'overview', label: 'Overview' },
+          { value: 'exercise', label: 'By exercise' },
+        ]}
+      />
 
-      <Card style={styles.week}>
-        <Stat label="Sessions this week" value={String(weekSessions.length)} />
-        <View style={styles.vr} />
-        <Stat label="Active this week" value={`${weekDays}/7`} />
-        <View style={styles.vr} />
-        <Stat label="Day streak" value={String(streak)} />
-      </Card>
+      {view === 'overview' ? (
+        <>
+          <Card style={styles.week}>
+            <Stat label="Sessions this week" value={String(weekSessions.length)} />
+            <View style={styles.vr} />
+            <Stat label="Active this week" value={`${weekDays}/7`} />
+            <View style={styles.vr} />
+            <Stat label="Day streak" value={String(streak)} />
+          </Card>
 
-      <SectionHeader title="This week" right="vs same days last week" style={styles.weekHead} />
-      <Card padded={false} style={styles.clip}>
-        {comparison.rows.length === 0 ? (
-          <Text style={[type.small, styles.pad]}>Nothing logged this week or the same days last week.</Text>
-        ) : (
-          <>
-            {(showAllWeek ? comparison.rows : comparison.rows.slice(0, 4)).map((r, i) => {
-              const e = getExercise(r.exerciseId);
-              const pct = percentChange(r.current, r.previous);
-              return (
-                <View key={r.exerciseId}>
-                  {i > 0 && <Divider inset={56} />}
-                  <View style={styles.cmpRow}>
-                    <Icon name={e.icon} size={22} color={exerciseIconColor(e.id)} />
-                    <View style={styles.flex}>
-                      <Text style={type.body} numberOfLines={1}>
-                        {e.name}
-                      </Text>
-                      <Text style={type.caption}>was {formatMetricText(r.previous, r.metric, prefs)}</Text>
+          <SectionHeader title="This week" right="vs same days last week" style={styles.weekHead} />
+          <Card padded={false} style={styles.clip}>
+            {comparison.rows.length === 0 ? (
+              <Text style={[type.small, styles.pad]}>Nothing logged this week or the same days last week.</Text>
+            ) : (
+              <>
+                {(showAllWeek ? comparison.rows : comparison.rows.slice(0, 4)).map((r, i) => {
+                  const e = getExercise(r.exerciseId);
+                  const pct = percentChange(r.current, r.previous);
+                  return (
+                    <View key={r.exerciseId}>
+                      {i > 0 && <Divider inset={56} />}
+                      <View style={styles.cmpRow}>
+                        <Icon name={e.icon} size={22} color={exerciseIconColor(e.id)} />
+                        <View style={styles.flex}>
+                          <Text style={type.body} numberOfLines={1}>
+                            {e.name}
+                          </Text>
+                          <Text style={type.caption}>was {formatMetricText(r.previous, r.metric, prefs)}</Text>
+                        </View>
+                        <Text style={[type.bodyStrong, tabular]}>{formatMetricText(r.current, r.metric, prefs)}</Text>
+                        <Delta pct={pct} isNew={r.previous === 0 && r.current > 0} />
+                      </View>
                     </View>
-                    <Text style={[type.bodyStrong, tabular]}>{formatMetricText(r.current, r.metric, prefs)}</Text>
-                    <Delta pct={pct} isNew={r.previous === 0 && r.current > 0} />
-                  </View>
-                </View>
-              );
-            })}
-            {comparison.rows.length > 4 && (
-              <Text style={styles.showAll} onPress={() => setShowAllWeek((v) => !v)} accessibilityRole="button">
-                {showAllWeek ? 'Show less' : `Show all ${comparison.rows.length}`}
-              </Text>
+                  );
+                })}
+                {comparison.rows.length > 4 && (
+                  <Text style={styles.showAll} onPress={() => setShowAllWeek((v) => !v)} accessibilityRole="button">
+                    {showAllWeek ? 'Show less' : `Show all ${comparison.rows.length}`}
+                  </Text>
+                )}
+              </>
             )}
-          </>
-        )}
-      </Card>
+          </Card>
 
-      <ChipRow>
-        {(exerciseOptions.length ? exerciseOptions : allExercises().slice(0, 6).map((e) => e.id)).map((id) => {
-          const e = getExercise(id);
-          return (
-            <Chip key={id} label={e.name} icon={e.icon} iconColor={exerciseIconColor(id)} selected={id === exerciseId} onPress={() => selectExercise(id)} />
-          );
-        })}
-      </ChipRow>
-
-      <Card style={styles.chartCard}>
-        <View style={styles.chartHead}>
-          <Text style={type.section}>{ex.name}</Text>
-          {metricsFor(ex.kind).length > 1 && (
-            <View style={styles.metricRow}>
-              {metricsFor(ex.kind).map((m) => (
-                <Text
-                  key={m}
-                  onPress={() => setMetric(m)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: m === metric }}
-                  style={[styles.metric, m === metric && styles.metricOn]}>
-                  {METRIC_LABEL[m]}
-                </Text>
-              ))}
-            </View>
-          )}
-        </View>
-        <Segmented
-          value={range}
-          onChange={setRange}
-          options={[
-            { value: 'week', label: '7 days' },
-            { value: 'month', label: '30 days' },
-            { value: 'quarter', label: '13 weeks' },
-          ]}
-        />
-        <View style={styles.chart}>
-          <BarChart key={`${exerciseId}-${metric}-${range}`} bars={bars} format={fmt} />
-        </View>
-        <Divider />
-        <View style={styles.statsRow}>
-          <Stat label={`Total`} value={fmt(rangeTotal)} small />
-          <Stat label={bucketWord === 'days' ? 'Days active' : 'Weeks active'} value={`${activeBuckets}/${buckets.length}`} small />
-          <Stat label={range === 'quarter' ? 'Best week' : 'Best day'} value={best ? fmt(best) : '–'} small />
-        </View>
-      </Card>
-
-      <SectionHeader title={trend.title} right="Last 90 days" style={styles.section} />
-      <Card>
-        {trend.points.length >= 2 ? (
-          <>
-            <LineChart key={`${exerciseId}-${trend.format}`} points={trend.points} format={(v) => formatStat(v, trend.format, prefs)} />
-            <Text style={[type.caption, styles.caption]}>{trend.caption}</Text>
-          </>
-        ) : (
-          <Text style={type.small}>Log {ex.name.toLowerCase()} on a few more days to see a trend.</Text>
-        )}
-      </Card>
-
-      <SectionHeader title="Muscle groups" right="Sets, last 7 days" style={styles.section} />
-      <Card>
-        {muscles.rows.map((r) => (
-          <View
-            key={r.muscle}
-            style={styles.muscleRow}
-            accessible
-            accessibilityLabel={`${MUSCLE_LABEL[r.muscle]}: ${r.sets} sets, 4-week average ${Math.round(r.avg)}`}>
-            <Text style={[type.small, styles.muscleLabel]}>{MUSCLE_LABEL[r.muscle]}</Text>
-            <View style={styles.muscleTrack}>
-              <View style={[styles.muscleBar, { width: `${(r.sets / muscles.max) * 100}%` }]} />
-              {r.avg > 0 && <View style={[styles.avgTick, { left: `${(r.avg / muscles.max) * 100}%` }]} />}
-            </View>
-            <Text style={[type.bodyStrong, tabular, styles.muscleValue]}>{r.sets}</Text>
-          </View>
-        ))}
-        <View style={styles.legendRow}>
-          <View style={styles.legendTick} />
-          <Text style={type.caption}>Your weekly average over the 4 weeks before</Text>
-        </View>
-      </Card>
-
-      <SectionHeader title="Personal bests" style={styles.section} />
-      <Card padded={false}>
-        {records.length === 0 ? (
-          <Text style={[type.small, styles.pad]}>Log {ex.name.toLowerCase()} to start setting records.</Text>
-        ) : (
-          records.map((r, i) => (
-            <View key={r.key}>
-              {i > 0 && <Divider inset={space.lg} />}
-              <View style={styles.record}>
-                <View style={styles.flex}>
-                  <Text style={type.body}>{r.label}</Text>
-                  <Text style={type.caption}>{formatDayShort(r.date)}</Text>
+          <SectionHeader title="Muscle groups" right="Sets, last 7 days" style={styles.section} />
+          <Card>
+            {muscles.rows.map((r) => (
+              <View
+                key={r.muscle}
+                style={styles.muscleRow}
+                accessible
+                accessibilityLabel={`${MUSCLE_LABEL[r.muscle]}: ${r.sets} sets, 4-week average ${Math.round(r.avg)}`}>
+                <Text style={[type.small, styles.muscleLabel]}>{MUSCLE_LABEL[r.muscle]}</Text>
+                <View style={styles.muscleTrack}>
+                  <View style={[styles.muscleBar, { width: `${(r.sets / muscles.max) * 100}%` }]} />
+                  {r.avg > 0 && <View style={[styles.avgTick, { left: `${(r.avg / muscles.max) * 100}%` }]} />}
                 </View>
-                <Text style={[type.bodyStrong, tabular]}>{formatRecord(r, prefs)}</Text>
+                <Text style={[type.bodyStrong, tabular, styles.muscleValue]}>{r.sets}</Text>
               </View>
+            ))}
+            <View style={styles.legendRow}>
+              <View style={styles.legendTick} />
+              <Text style={type.caption}>Your weekly average over the 4 weeks before</Text>
             </View>
-          ))
-        )}
-      </Card>
-
-      <SectionHeader title="History" right={history.length ? `${history.length} sessions` : undefined} style={styles.section} />
-      {history.length === 0 ? (
-        <Card>
-          <EmptyState icon="chart-bar" title="No sessions yet" body={`Sessions with ${ex.name.toLowerCase()} will appear here.`} />
-        </Card>
+          </Card>
+        </>
       ) : (
         <>
-          {history.slice(0, historyLimit).map((s) => (
-            <SessionCard key={s.id} session={s} prefs={prefs} tz={tz} today={today} showDate onlyExerciseId={exerciseId} />
-          ))}
-          {history.length > historyLimit && (
-            <Button label="Show more" variant="secondary" compact onPress={() => setHistoryLimit((n) => n + 10)} />
+          <View style={styles.chips}>
+            <ChipRow>
+              {(exerciseOptions.length ? exerciseOptions : allExercises().slice(0, 6).map((e) => e.id)).map((id) => {
+                const e = getExercise(id);
+                return (
+                  <Chip key={id} label={e.name} icon={e.icon} iconColor={exerciseIconColor(id)} selected={id === exerciseId} onPress={() => selectExercise(id)} />
+                );
+              })}
+            </ChipRow>
+          </View>
+
+          <Card style={styles.chartCard}>
+            <View style={styles.chartHead}>
+              <Text style={type.section}>{ex.name}</Text>
+              {metricsFor(ex.kind).length > 1 && (
+                <View style={styles.metricRow}>
+                  {metricsFor(ex.kind).map((m) => (
+                    <Text
+                      key={m}
+                      onPress={() => setMetric(m)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: m === metric }}
+                      style={[styles.metric, m === metric && styles.metricOn]}>
+                      {METRIC_LABEL[m]}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+            <Segmented
+              value={range}
+              onChange={setRange}
+              options={[
+                { value: 'week', label: '7 days' },
+                { value: 'month', label: '30 days' },
+                { value: 'quarter', label: '13 weeks' },
+              ]}
+            />
+            <View style={styles.chart}>
+              <BarChart key={`${exerciseId}-${metric}-${range}`} bars={bars} format={fmt} />
+            </View>
+            <Divider />
+            <View style={styles.statsRow}>
+              <Stat label={`Total`} value={fmt(rangeTotal)} small />
+              <Stat label={bucketWord === 'days' ? 'Days active' : 'Weeks active'} value={`${activeBuckets}/${buckets.length}`} small />
+              <Stat label={range === 'quarter' ? 'Best week' : 'Best day'} value={best ? fmt(best) : '–'} small />
+            </View>
+          </Card>
+
+          <SectionHeader title={trend.title} right="Last 90 days" style={styles.section} />
+          <Card>
+            {trend.points.length >= 2 ? (
+              <>
+                <LineChart key={`${exerciseId}-${trend.format}`} points={trend.points} format={(v) => formatStat(v, trend.format, prefs)} />
+                <Text style={[type.caption, styles.caption]}>{trend.caption}</Text>
+              </>
+            ) : (
+              <Text style={type.small}>Log {ex.name.toLowerCase()} on a few more days to see a trend.</Text>
+            )}
+          </Card>
+
+          <SectionHeader title="Personal bests" style={styles.section} />
+          <Card padded={false}>
+            {records.length === 0 ? (
+              <Text style={[type.small, styles.pad]}>Log {ex.name.toLowerCase()} to start setting records.</Text>
+            ) : (
+              records.map((r, i) => (
+                <View key={r.key}>
+                  {i > 0 && <Divider inset={space.lg} />}
+                  <View style={styles.record}>
+                    <View style={styles.flex}>
+                      <Text style={type.body}>{r.label}</Text>
+                      <Text style={type.caption}>{formatDayShort(r.date)}</Text>
+                    </View>
+                    <Text style={[type.bodyStrong, tabular]}>{formatRecord(r, prefs)}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </Card>
+
+          <SectionHeader title="History" right={history.length ? `${history.length} sessions` : undefined} style={styles.section} />
+          {history.length === 0 ? (
+            <Card>
+              <EmptyState icon="chart-bar" title="No sessions yet" body={`Sessions with ${ex.name.toLowerCase()} will appear here.`} />
+            </Card>
+          ) : (
+            <>
+              {history.slice(0, historyLimit).map((s) => (
+                <SessionCard key={s.id} session={s} prefs={prefs} tz={tz} today={today} showDate onlyExerciseId={exerciseId} />
+              ))}
+              {history.length > historyLimit && (
+                <Button label="Show more" variant="secondary" compact onPress={() => setHistoryLimit((n) => n + 10)} />
+              )}
+            </>
           )}
         </>
       )}
@@ -301,7 +318,8 @@ function Stat({ label, value, small }: { label: string; value: string; small?: b
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  week: { flexDirection: 'row', alignItems: 'center', marginBottom: space.lg, paddingVertical: space.md },
+  week: { flexDirection: 'row', alignItems: 'center', marginTop: space.lg, marginBottom: space.lg, paddingVertical: space.md },
+  chips: { marginTop: space.lg },
   vr: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: colors.border },
   stat: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: 4 },
   statValue: { fontSize: 22, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },

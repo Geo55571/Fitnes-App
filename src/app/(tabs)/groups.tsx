@@ -52,6 +52,7 @@ export default function GroupsScreen() {
   const syncState = useSync();
   const signedIn = !!syncState.userId;
   const [joinOpen, setJoinOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [code, setCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
 
@@ -79,14 +80,13 @@ export default function GroupsScreen() {
   return (
     <Screen
       tab
-      header={<AppHeader actions={<IconButton icon="plus" label="Create group" size={26} onPress={() => router.push('/group/new')} />} />}>
+      header={<AppHeader actions={<IconButton icon="plus" label="Create or join a group" size={26} onPress={() => setAddOpen(true)} />} />}>
       <ScreenTitle title="Groups" />
 
       {!signedIn ? (
         <Pressable onPress={() => router.push('/account')} accessibilityRole="button">
           <Notice icon="account-group">
-            Create an account (just a name and a password) to invite friends, compete in challenges and see the overall
-            ranking. <Text style={styles.inlineLink}>Create account</Text>
+            Compete with friends: create an account with just a name and a password. <Text style={styles.inlineLink}>Create account</Text>
           </Notice>
         </Pressable>
       ) : (
@@ -112,7 +112,12 @@ export default function GroupsScreen() {
             icon="account-group"
             title="No groups yet"
             body="Create a group, set a challenge with a metric and dates, and compare results."
-            action={<Button label="Create group" icon="plus" compact onPress={() => router.push('/group/new')} style={styles.emptyBtn} />}
+            action={
+              <View style={styles.emptyActions}>
+                <Button label="Create group" icon="plus" compact onPress={() => router.push('/group/new')} />
+                <Button label="Join with code" variant="secondary" compact onPress={() => setJoinOpen(true)} />
+              </View>
+            }
           />
         </Card>
       ) : (
@@ -192,8 +197,6 @@ export default function GroupsScreen() {
         })
       )}
 
-      <Button label="Join with invite code" variant="secondary" compact icon="account-group" onPress={() => setJoinOpen(true)} style={styles.joinBtn} />
-
       <Card padded={false} style={styles.block}>
         <SectionHeader title="Friends" style={styles.friendsHead} />
         {friends.length === 0 ? (
@@ -227,6 +230,29 @@ export default function GroupsScreen() {
         )}
       </Card>
 
+      <Sheet visible={addOpen} onClose={() => setAddOpen(false)} title="Groups">
+        <ListRow
+          icon="plus-circle-outline"
+          title="Create a group"
+          subtitle="Invite friends and set challenges"
+          onPress={() => {
+            setAddOpen(false);
+            router.push('/group/new');
+          }}
+        />
+        <Divider inset={56} />
+        <ListRow
+          icon="account-group"
+          title="Join with an invite code"
+          subtitle="Use the 6-character code from a friend"
+          onPress={() => {
+            setAddOpen(false);
+            // Let the first sheet finish closing (iOS can't present two at once).
+            setTimeout(() => setJoinOpen(true), 350);
+          }}
+        />
+      </Sheet>
+
       <Sheet visible={joinOpen} onClose={() => { setJoinOpen(false); setJoinError(null); }} title="Join a group">
         <Field
           label="Invite code"
@@ -248,7 +274,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   block: { marginTop: space.lg, overflow: 'hidden' },
   pressed: { backgroundColor: colors.surfaceMuted },
-  emptyBtn: { marginTop: space.md },
+  emptyActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.sm, marginTop: space.md },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
   groupIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
@@ -260,7 +286,6 @@ const styles = StyleSheet.create({
   chTitle: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.sm },
   noChallenge: { gap: 4 },
   link: { fontSize: 15, fontWeight: '600', color: colors.primary },
-  joinBtn: { marginTop: space.lg },
   friendsHead: { paddingHorizontal: space.lg, paddingTop: space.lg, marginBottom: space.xs },
   friendsEmpty: { paddingHorizontal: space.lg, paddingBottom: space.lg },
   sheetBtn: { marginTop: space.lg },

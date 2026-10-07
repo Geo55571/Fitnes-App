@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { confirmAction } from '@/components/confirm';
 import { Icon } from '@/components/Icon';
 import { showToast } from '@/components/toast';
-import { Button, Card, Divider, IconButton, ListRow, Notice, Screen, Segmented, StackHeader, Tag } from '@/components/ui';
+import { Button, Card, Divider, ListRow, Notice, Screen, Segmented, StackHeader, Tag } from '@/components/ui';
 import { StatusRow } from '@/components/winterArc/parts';
 import { TheArc } from '@/components/winterArc/TheArc';
 import { formatDayShort, formatMonthDay } from '@/domain/dates';
@@ -17,7 +17,7 @@ import { colors, radius, space, tabular, type } from '@/theme';
 export default function WinterArcScreen() {
   const { joined } = useWinterArc();
   return (
-    <Screen header={<StackHeader title="Winter Arc" right={<IconButton icon="file-document-outline" label="Rules" onPress={() => router.push('/winter-arc/rules')} />} />}>
+    <Screen header={<StackHeader title="Winter Arc" />}>
       {joined ? <Dashboard /> : <Join />}
     </Screen>
   );
@@ -126,8 +126,6 @@ function Dashboard() {
       <Card padded={false} style={[styles.block, styles.clip]}>
         {stats.phase !== 'upcoming' && (
           <>
-            <ListRow icon="check-circle-outline" title="Check in" subtitle="Nutrition, reading, discipline" onPress={() => router.push({ pathname: '/winter-arc/day/[date]', params: { date: stats.phase === 'finished' ? WINTER_ARC.end : today } })} />
-            <Divider inset={56} />
             <ListRow icon="weight-lifter" title="Add workout" subtitle="Strength or endurance" onPress={() => router.push('/winter-arc/workout')} />
             <Divider inset={56} />
           </>

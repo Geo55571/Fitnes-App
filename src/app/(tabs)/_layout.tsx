@@ -15,9 +15,8 @@ type IonName = ComponentProps<typeof Ionicons>['name'];
 const TABS: { name: string; label: string; icon: IonName; iconOn: IonName }[] = [
   { name: 'index', label: 'Today', icon: 'home-outline', iconOn: 'home' },
   { name: 'log', label: 'Log', icon: 'list-outline', iconOn: 'list' },
-  { name: 'plan', label: 'Plan', icon: 'calendar-clear-outline', iconOn: 'calendar-clear' },
-  { name: 'groups', label: 'Groups', icon: 'people-outline', iconOn: 'people' },
   { name: 'progress', label: 'Progress', icon: 'stats-chart-outline', iconOn: 'stats-chart' },
+  { name: 'groups', label: 'Groups', icon: 'people-outline', iconOn: 'people' },
 ];
 
 interface TabBarProps {
@@ -25,8 +24,8 @@ interface TabBarProps {
   navigation: { navigate: (name: string) => void; emit: (e: { type: 'tabPress'; target: string; canPreventDefault: true }) => { defaultPrevented: boolean } };
 }
 
-/** Today, Log and Plan sit left of the camera; Groups and Progress right. Equal-width sides keep the camera centred. */
-const LEFT = new Set(['index', 'log', 'plan']);
+/** Today and Log sit left of the camera; Progress and Groups right. Equal-width sides keep the camera centred. */
+const LEFT = new Set(['index', 'log']);
 
 function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();

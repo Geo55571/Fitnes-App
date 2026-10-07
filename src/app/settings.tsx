@@ -71,7 +71,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen header={<StackHeader title="Settings" />}>
-      <Group title="Profile">
+      <Group title="Profile & account">
         <View style={styles.pad}>
           <Field
             label="Name"
@@ -83,9 +83,7 @@ export default function SettingsScreen() {
             maxLength={40}
           />
         </View>
-      </Group>
-
-      <Group title="Account">
+        <Divider />
         <ListRow
           icon="account-group"
           title="Account"
@@ -94,7 +92,7 @@ export default function SettingsScreen() {
         />
       </Group>
 
-      <Group title="Units">
+      <Group title="Units & time">
         <View style={styles.pad}>
           <Text style={styles.label}>Distance</Text>
           <Segmented
@@ -114,11 +112,8 @@ export default function SettingsScreen() {
               { value: 'lb', label: 'Pounds' },
             ]}
           />
-          <Text style={[type.caption, styles.mt]}>Entries are stored precisely and shown in your chosen units everywhere.</Text>
         </View>
-      </Group>
-
-      <Group title="Time zone">
+        <Divider />
         <ListRow icon="earth" title={tzLabel} subtitle="Daily goals reset at midnight in this time zone." onPress={() => setTzOpen(true)} />
       </Group>
 
@@ -205,43 +200,28 @@ export default function SettingsScreen() {
         <LocalAiSettings cloud={s.settings.cloudPhotoReading} onCloudChange={(v) => set({ cloudPhotoReading: v })} />
       </Group>
 
-      <Group title="Avatar & Today">
-        <ListRow icon="tshirt-crew-outline" title="Customize avatar" subtitle="Body, skin, hair, outfit and badge" onPress={() => router.push('/avatar')} />
-        <Divider inset={56} />
-        <ListRow icon="chart-bar" title="Trackers on Today" subtitle="Choose which exercises show on Today" onPress={() => router.push('/trackers')} />
-      </Group>
-
-      <Group title="Sample data">
-        <View style={styles.pad}>
-          <Text style={type.small}>
-            {s.demoLoaded
-              ? 'Sample history, a sample group and sample friends are loaded. They’re marked “Sample” everywhere.'
-              : 'Load example history, a sample group and sample friends to explore the app. Everything is marked “Sample” and can be removed.'}
-          </Text>
-          <Button
-            compact
-            variant={s.demoLoaded ? 'danger' : 'secondary'}
-            label={s.demoLoaded ? 'Remove sample data' : 'Load sample data'}
-            style={styles.mt}
-            onPress={() => {
-              if (s.demoLoaded) {
-                s.clearDemo();
-                showToast('Sample data removed');
-              } else {
-                s.loadDemo(today);
-                showToast('Sample data loaded');
-              }
-            }}
-          />
-        </View>
-      </Group>
-
       <Group title="Data">
         <ListRow
           icon="content-copy"
           title="Backup & export"
           subtitle={s.profile.lastBackupAt ? `Last backup ${timeAgo(s.profile.lastBackupAt)}` : 'No backup yet'}
           onPress={() => router.push('/backup')}
+        />
+        <Divider inset={56} />
+        <ListRow
+          icon="flask-outline"
+          title={s.demoLoaded ? 'Remove sample data' : 'Load sample data'}
+          subtitle={s.demoLoaded ? 'Sample history, group and friends are loaded' : 'Example history, a group and friends to explore'}
+          chevron={false}
+          onPress={() => {
+            if (s.demoLoaded) {
+              s.clearDemo();
+              showToast('Sample data removed');
+            } else {
+              s.loadDemo(today);
+              showToast('Sample data loaded');
+            }
+          }}
         />
         <Divider />
         <View style={styles.pad}>

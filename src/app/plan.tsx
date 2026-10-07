@@ -7,7 +7,7 @@ import { Calendar, type DayStatus } from '@/components/Calendar';
 import { GoalRow } from '@/components/GoalRow';
 import { exerciseIconColor, Icon } from '@/components/Icon';
 import { showToast } from '@/components/toast';
-import { AppHeader, Button, Card, Divider, ListRow, Screen, ScreenTitle, SectionHeader } from '@/components/ui';
+import { Button, Card, Divider, ListRow, Screen, SectionHeader, StackHeader } from '@/components/ui';
 import { formatRelativeDay, startOfMonth } from '@/domain/dates';
 import { describeEntry, goalTitle, scheduleLabel } from '@/domain/describe';
 import { getExercise } from '@/domain/exercises';
@@ -76,12 +76,14 @@ export default function PlanScreen() {
   const logged = (byDate.get(selected) ?? []).flatMap((sess) => sess.entries.map((entry) => ({ key: `${sess.id}-${entry.id}`, entry })));
 
   return (
-    <Screen tab header={<AppHeader />}>
-      <ScreenTitle
-        title="Plan"
-        right={<Button label="Goal" icon="plus" compact onPress={() => router.push({ pathname: '/goal/[id]', params: { id: 'new', date: selected } })} />}
-      />
-      <Card>
+    <Screen
+      header={
+        <StackHeader
+          title="Plan & goals"
+          right={<Button label="Goal" icon="plus" compact onPress={() => router.push({ pathname: '/goal/[id]', params: { id: 'new', date: selected } })} />}
+        />
+      }>
+      <Card style={styles.calendar}>
         <Calendar
           month={month}
           selected={selected}
@@ -220,6 +222,7 @@ export default function PlanScreen() {
 }
 
 const styles = StyleSheet.create({
+  calendar: { marginTop: space.xs },
   day: { marginTop: space.xl },
   dayCard: { paddingVertical: space.xs },
   empty: { paddingVertical: space.md },

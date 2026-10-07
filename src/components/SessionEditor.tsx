@@ -255,7 +255,7 @@ export function SessionEditor({
     const used = new Set(blocks.map((b) => b.exerciseId));
     return recentIn(category, sessions).concat(exercisesIn(category).map((e) => e.id))
       .filter((id, i, arr) => arr.indexOf(id) === i && !used.has(id))
-      .slice(0, 6);
+      .slice(0, 4);
   }, [blocks, category, sessions]);
 
   const save = () => {

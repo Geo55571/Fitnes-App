@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
@@ -7,13 +7,12 @@ import { SessionCard } from '@/components/SessionCard';
 import { SessionEditor } from '@/components/SessionEditor';
 import { RestTimerBar, useRestActive } from '@/components/timers';
 import { showToast } from '@/components/toast';
-import { AppHeader, Button, Screen, ScreenTitle, SectionHeader } from '@/components/ui';
+import { AppHeader, Screen, ScreenTitle, SectionHeader } from '@/components/ui';
 import { formatRelativeDay } from '@/domain/dates';
 import { sessionsOn } from '@/domain/metrics';
 import type { Category } from '@/domain/types';
 import { goalFeedback } from '@/hooks/saveFeedback';
 import { useClock, useUnits } from '@/hooks/today';
-import { resetScan } from '@/scan';
 import { useStore } from '@/store/store';
 import { space, type } from '@/theme';
 
@@ -32,21 +31,7 @@ export default function LogScreen() {
 
   return (
     <Screen tab header={<AppHeader />} footer={resting ? <RestTimerBar /> : undefined}>
-      <ScreenTitle
-        title="Log activity"
-        right={
-          <Button
-            label="Scan"
-            icon="camera-outline"
-            compact
-            variant="secondary"
-            onPress={() => {
-              resetScan();
-              router.push('/scan');
-            }}
-          />
-        }
-      />
+      <ScreenTitle title="Log activity" />
       <SessionEditor
         key={`${params.exercise ?? ''}-${params.category ?? ''}-${resetCount}`}
         prefs={prefs}
