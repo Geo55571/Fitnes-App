@@ -1,0 +1,9 @@
+{
+  // Cloudflare Pages: the web build in dist/ is deployed as project "form-fitness".
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "form-fitness",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2026-09-30",
+  // The account and group sync server (server/), reached through /api/sync.
+  "services": [{ "binding": "SYNC", "service": "form-sync" }]
+}

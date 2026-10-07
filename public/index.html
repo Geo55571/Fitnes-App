@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <!-- viewport-fit=cover exposes safe-area insets (notch / home indicator) to the app. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F6F5F1" />
+    <meta name="description" content="FORM — log workouts, hit daily goals and compete with friends." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="FORM" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>FORM</title>
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #f6f5f1;
+        /* No pull-to-refresh or bounce on the page itself; scrolling happens inside the app's lists. */
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        overflow: hidden;
+        /* Taps respond immediately (no double-tap-zoom delay) and without a grey flash. */
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #root {
+        display: flex;
+        flex: 1;
+        height: 100%;
+        /* Mobile browsers: size to the visible area so the tab bar never hides behind browser toolbars. */
+        height: 100dvh;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run FORM.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

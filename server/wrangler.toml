@@ -1,0 +1,15 @@
+# FORM sync server: accounts (name + password), groups, challenges, shared workouts.
+# One Durable Object with SQLite storage. Deploy: npm run deploy:server
+name = "form-sync"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+# Only reachable through the website (Pages service binding), not on its own URL.
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "STORE"
+class_name = "SyncStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncStore"]

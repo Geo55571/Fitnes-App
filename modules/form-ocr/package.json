@@ -1,0 +1,8 @@
+{
+  "name": "form-ocr",
+  "version": "1.0.0",
+  "description": "On-device text recognition for FORM: Apple Vision on iOS, Google ML Kit on Android.",
+  "main": "src/index.ts",
+  "private": true,
+  "license": "MIT"
+}
